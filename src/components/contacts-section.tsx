@@ -27,6 +27,7 @@ import {
   Search,
   Download,
   Upload,
+  Pencil,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { addContacts, getContacts, Contact } from "@/actions/contacts"
@@ -53,6 +54,8 @@ export default function ContactsSection({
   const [searchTerm, setSearchTerm] = useState("")
   const [newContact, setNewContact] = useState({ name: "", phoneNumber: "" })
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [editingContact, setEditingContact] = useState<Contact | null>(null)
   const { toast } = useToast()
 
   // Load contacts on component mount
@@ -320,6 +323,81 @@ export default function ContactsSection({
     })
   }
 
+  // Handle editing a contact
+  const handleEditContact = async () => {
+    if (!editingContact?.name) {
+      toast({
+        title: "Error",
+        description: "Name is required",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      // Create a new array with the updated contact name
+      const updatedContacts = contacts.map(contact => 
+        contact.phoneNumber === editingContact.phoneNumber 
+          ? { ...contact, name: editingContact.name }
+          : contact
+      )
+
+      // Send the updated contacts list to the backend
+      const result = await addContacts(updatedContacts)
+      
+      if (result.success) {
+        // Update the local state
+        setContacts(updatedContacts)
+        setEditingContact(null)
+        setIsEditDialogOpen(false)
+        
+        // Reload contacts from the backend to ensure consistency
+        await loadContacts()
+        
+        toast({
+          title: "Contact updated",
+          description: `Contact name has been updated to ${editingContact.name}`,
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error updating contact:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update contact. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Handle opening edit dialog
+  const handleOpenEditDialog = (contact: Contact) => {
+    // Create a new copy of the contact to edit
+    setEditingContact({ ...contact })
+    setIsEditDialogOpen(true)
+  }
+
+  // Handle contact input change
+  const handleContactChange = (field: keyof Contact, value: string) => {
+    if (editingContact) {
+      setEditingContact(prev => ({
+        ...prev!,
+        [field]: value
+      }))
+    }
+  }
+
+  // Handle dialog close
+  const handleDialogClose = () => {
+    setEditingContact(null)
+    setIsEditDialogOpen(false)
+  }
+
   return (
     <div className="bg-card rounded-lg shadow">
       <div className="bg-primary text-primary-foreground p-4 rounded-t-lg flex justify-between items-center">
@@ -419,6 +497,7 @@ export default function ContactsSection({
               <TableHead>Name</TableHead>
               <TableHead>Number</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -442,11 +521,20 @@ export default function ContactsSection({
                       Ready
                     </Badge>
                   </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleOpenEditDialog(contact)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
+                <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
                   {searchTerm ? "No contacts found" : "No contacts added yet"}
                 </TableCell>
               </TableRow>
@@ -460,6 +548,43 @@ export default function ContactsSection({
           {selectedContacts.length} of {filteredContacts.length} selected
         </span>
       </div>
+
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Contact</DialogTitle>
+            <DialogDescription>Edit the contact name. Phone number cannot be changed.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="edit-name">Name</Label>
+              <Input
+                id="edit-name"
+                value={editingContact?.name || ""}
+                onChange={(e) => handleContactChange('name', e.target.value)}
+                placeholder="John Smith"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-number">Phone Number</Label>
+              <Input
+                id="edit-number"
+                value={editingContact?.phoneNumber || ""}
+                disabled
+                className="bg-muted"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleDialogClose}>
+              Cancel
+            </Button>
+            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground" onClick={handleEditContact}>
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
