@@ -54,6 +54,7 @@ import { useFormState, useFormStatus } from "react-dom";
 import { Contact } from "@/actions/contacts";
 import { uploadImageToImgBB } from "@/actions/image-upload";
 import { useSendingLog } from "@/contexts/sending-log";
+import { useSendingSettings } from "@/contexts/sending-settings"
 
 interface TemplateParameter {
   type: string;
@@ -106,6 +107,8 @@ export default function MessageComposer({
   const [isAttachDialogOpen, setIsAttachDialogOpen] = useState(false);
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
   const [isScheduled, setIsScheduled] = useState(false);
+  const [scheduledDateTime, setScheduledDateTime] = useState<string>("");
+  const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
   const [editingAttachment, setEditingAttachment] = useState<{
     id: number;
     name: string;
@@ -126,6 +129,7 @@ export default function MessageComposer({
     { type: string; text: string }[]
   >([]);
   const { addLog } = useSendingLog();
+  const { settings } = useSendingSettings()
 
   // Handle text formatting
   const formatText = (format: "bold" | "italic" | "underline") => {
@@ -261,6 +265,16 @@ export default function MessageComposer({
       return;
     }
 
+    // Check if scheduled but no datetime selected
+    if (isScheduled && !scheduledDateTime) {
+      addLog(
+        "Schedule time required",
+        "error",
+        "Please select a date and time for scheduled sending"
+      );
+      return;
+    }
+
     try {
       // Filter attachments to only include selected ones
       const selectedAttachmentsToSend = attachments.filter((attachment) =>
@@ -274,8 +288,10 @@ export default function MessageComposer({
           attachments: [],
           isTurboMode: false,
           isScheduled,
-          scheduledTime: isScheduled ? new Date().toISOString() : undefined,
+          scheduledTime: isScheduled ? scheduledDateTime : undefined,
           recipients: selectedContacts.map((contact) => contact.phoneNumber),
+          timeGap: settings.timeGap,
+          randomizeOrder: settings.randomizeOrder
         });
 
         const parsedResults = parseApiResponse(textResult);
@@ -285,13 +301,13 @@ export default function MessageComposer({
           const recipientInfo = result.recipient ? `to ${result.recipient}` : '';
           if (result.isSuccess) {
             addLog(
-              `Message sent ${recipientInfo}`,
+              `Message ${isScheduled ? 'scheduled' : 'sent'} ${recipientInfo}`,
               "success",
               `Message ID: ${result.messageId}\n\nFull Response: ${JSON.stringify(result.details, null, 2)}`
             );
           } else {
             addLog(
-              `Failed to send message ${recipientInfo}`,
+              `Failed to ${isScheduled ? 'schedule' : 'send'} message ${recipientInfo}`,
               "error",
               `Error: ${result.error?.message || "Unknown error"}\n\nFull Response: ${JSON.stringify(result.details, null, 2)}`
             );
@@ -312,8 +328,10 @@ export default function MessageComposer({
             attachments: [attachment],
             isTurboMode: false,
             isScheduled,
-            scheduledTime: isScheduled ? new Date().toISOString() : undefined,
+            scheduledTime: isScheduled ? scheduledDateTime : undefined,
             recipients: selectedContacts.map((contact) => contact.phoneNumber),
+            timeGap: settings.timeGap,
+            randomizeOrder: settings.randomizeOrder
           });
 
           const parsedResults = parseApiResponse(attachmentResult);
@@ -323,13 +341,13 @@ export default function MessageComposer({
             const recipientInfo = result.recipient ? `to ${result.recipient}` : '';
             if (result.isSuccess) {
               addLog(
-                `Attachment sent ${recipientInfo}: ${attachment.name}`,
+                `Attachment ${isScheduled ? 'scheduled' : 'sent'} ${recipientInfo}: ${attachment.name}`,
                 "success",
                 `Message ID: ${result.messageId}\n\nFull Response: ${JSON.stringify(result.details, null, 2)}`
               );
             } else {
               addLog(
-                `Failed to send ${attachment.name} ${recipientInfo}`,
+                `Failed to ${isScheduled ? 'schedule' : 'send'} ${attachment.name} ${recipientInfo}`,
                 "error",
                 `Error: ${result.error?.message || "Unknown error"}\n\nFull Response: ${JSON.stringify(result.details, null, 2)}`
               );
@@ -350,8 +368,10 @@ export default function MessageComposer({
           attachments: selectedAttachmentsToSend,
           isTurboMode: true,
           isScheduled,
-          scheduledTime: isScheduled ? new Date().toISOString() : undefined,
+          scheduledTime: isScheduled ? scheduledDateTime : undefined,
           recipients: selectedContacts.map((contact) => contact.phoneNumber),
+          timeGap: settings.timeGap,
+          randomizeOrder: settings.randomizeOrder
         });
 
         const parsedResults = parseApiResponse(result);
@@ -361,13 +381,13 @@ export default function MessageComposer({
           const recipientInfo = result.recipient ? `to ${result.recipient}` : '';
           if (result.isSuccess) {
             addLog(
-              `Message and attachments sent ${recipientInfo}`,
+              `Message and attachments ${isScheduled ? 'scheduled' : 'sent'} ${recipientInfo}`,
               "success",
               `Message ID: ${result.messageId}\n\nFull Response: ${JSON.stringify(result.details, null, 2)}`
             );
           } else {
             addLog(
-              `Failed to send message and attachments ${recipientInfo}`,
+              `Failed to ${isScheduled ? 'schedule' : 'send'} message and attachments ${recipientInfo}`,
               "error",
               `Error: ${result.error?.message || "Unknown error"}\n\nFull Response: ${JSON.stringify(result.details, null, 2)}`
             );
@@ -383,6 +403,10 @@ export default function MessageComposer({
       setMessage("");
       setAttachments([]);
       setSelectedAttachments([]);
+      if (isScheduled) {
+        setIsScheduled(false);
+        setScheduledDateTime("");
+      }
     } catch (error) {
       addLog(
         "An unexpected error occurred",
@@ -561,9 +585,34 @@ export default function MessageComposer({
     }
   };
 
-  // Toggle scheduled sending
-  const toggleScheduled = () => {
-    setIsScheduled(!isScheduled);
+  // Handle scheduling
+  const handleScheduleEdit = () => {
+    if (!scheduledDateTime) {
+      // Set default to current date/time if not set
+      const now = new Date();
+      const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+        .toISOString()
+        .slice(0, 16);
+      setScheduledDateTime(localDateTime);
+    }
+    setIsScheduleDialogOpen(true);
+  };
+
+  const handleScheduleSave = () => {
+    setIsScheduled(true);
+    setIsScheduleDialogOpen(false);
+  };
+
+  const handleScheduleCancel = () => {
+    if (!isScheduled) {
+      setScheduledDateTime("");
+    }
+    setIsScheduleDialogOpen(false);
+  };
+
+  const handleScheduleRemove = () => {
+    setIsScheduled(false);
+    setScheduledDateTime("");
   };
 
   const handleSendTemplate = async () => {
@@ -998,7 +1047,7 @@ export default function MessageComposer({
               className={`text-primary hover:text-primary/90 ${
                 isScheduled ? "font-semibold" : ""
               }`}
-              onClick={toggleScheduled}
+              onClick={handleScheduleEdit}
             >
               <Calendar className="h-4 w-4 mr-1" />{" "}
               {isScheduled ? "Scheduled" : "Schedule"}
@@ -1011,9 +1060,12 @@ export default function MessageComposer({
         {isScheduled && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Calendar className="h-4 w-4" />
-            <span>Scheduled for: {new Date().toLocaleString()}</span>
-            <Button variant="outline" size="sm" className="h-7 px-2">
+            <span>Scheduled for: {new Date(scheduledDateTime).toLocaleString()}</span>
+            <Button variant="outline" size="sm" className="h-7 px-2" onClick={handleScheduleEdit}>
               Edit
+            </Button>
+            <Button variant="outline" size="sm" className="h-7 px-2" onClick={handleScheduleRemove}>
+              Remove
             </Button>
           </div>
         )}
@@ -1027,6 +1079,38 @@ export default function MessageComposer({
           </Button>
         </div>
       </div>
+
+      <Dialog open={isScheduleDialogOpen} onOpenChange={setIsScheduleDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Schedule Message</DialogTitle>
+            <DialogDescription>
+              Choose when you want this message to be sent
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="schedule-datetime">Date and Time</Label>
+              <Input
+                id="schedule-datetime"
+                type="datetime-local"
+                value={scheduledDateTime}
+                onChange={(e) => setScheduledDateTime(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={handleScheduleCancel}>
+              Cancel
+            </Button>
+            <Button onClick={handleScheduleSave}>
+              Save Schedule
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

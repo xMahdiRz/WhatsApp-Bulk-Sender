@@ -9,6 +9,7 @@ import ScheduledMessages from "@/components/scheduled-messages"
 import ThemeChanger from "@/components/theme-changer"
 import { useEffect, useState } from "react"
 import { Contact } from "@/actions/contacts"
+import { MessageHistory } from "@/components/message-history"
 
 export default function WhatsAppBulkSender() {
   // Add this to prevent hydration mismatch
@@ -89,7 +90,7 @@ export default function WhatsAppBulkSender() {
           <TabsContent value="history">
             <div className="bg-card rounded-lg shadow p-6">
               <h2 className="text-xl font-semibold mb-4">Message History</h2>
-              <p className="text-muted-foreground">Your message history will appear here.</p>
+              <MessageHistory />
             </div>
           </TabsContent>
 

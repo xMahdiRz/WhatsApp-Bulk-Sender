@@ -69,6 +69,8 @@ export type SendMessageRequest = {
   isScheduled: boolean;
   scheduledTime?: string;
   recipients: string[];
+  timeGap?: number;
+  randomizeOrder?: boolean;
 };
 
 export async function sendMessage(request: SendMessageRequest) {
@@ -80,6 +82,8 @@ export async function sendMessage(request: SendMessageRequest) {
       isScheduled,
       scheduledTime,
       recipients,
+      timeGap = 0,
+      randomizeOrder = false
     } = request;
 
     // Get the session token
@@ -88,18 +92,42 @@ export async function sendMessage(request: SendMessageRequest) {
     const sessionCookie = cookieStore.get("authjs.session-token");
     const authToken = session?.accessToken;
 
+    // Validate and format scheduled time
+    let formattedScheduledTime = null;
+    if (isScheduled && scheduledTime) {
+      try {
+        const scheduledDate = new Date(scheduledTime);
+        if (isNaN(scheduledDate.getTime())) {
+          throw new Error("Invalid date format");
+        }
+        formattedScheduledTime = scheduledDate.toISOString();
+      } catch (error) {
+        console.error("Error formatting scheduled time:", error);
+        return {
+          success: false,
+          error: "Invalid scheduled time format",
+        };
+      }
+    }
+
+    // Handle randomized order
+    let orderedRecipients = [...recipients];
+    if (randomizeOrder) {
+      orderedRecipients = orderedRecipients.sort(() => Math.random() - 0.5);
+    }
+
     const baseRequest = {
-      to: recipients,
+      to: orderedRecipients,
       accessToken: process.env.WHATSAPP_TOKEN,
-      delayBetweenMessagesInMs: 0,
-      scheduledTimeInUtc: isScheduled ? scheduledTime : null,
+      delayBetweenMessagesInMs: timeGap * 1000, // Convert seconds to milliseconds
+      scheduledTimeInUtc: formattedScheduledTime,
     };
 
     if (!isTurboMode && attachments.length > 0) {
       // Handle file attachments
       for (const attachment of attachments) {
         if (attachment.type === "Image" && attachment.url) {
-          await api.post("/api/whatsapp/sender/Image", {
+          const response = await api.post("/api/whatsapp/sender/Image", {
             ...baseRequest,
             image: {
               link: attachment.url,
@@ -107,8 +135,9 @@ export async function sendMessage(request: SendMessageRequest) {
               filename: attachment.name,
             },
           });
+          console.log("Image message response:", response.data);
         } else if (attachment.type === "Document" && attachment.url) {
-          await api.post("/api/whatsapp/sender/document", {
+          const response = await api.post("/api/whatsapp/sender/document", {
             ...baseRequest,
             document: {
               link: attachment.url,
@@ -116,21 +145,23 @@ export async function sendMessage(request: SendMessageRequest) {
               filename: attachment.name,
             },
           });
+          console.log("Document message response:", response.data);
         }
       }
-    } else {
-      // Send text only
-      const response = await api.post("/api/whatsapp/sender/text", {
+    }
+
+    if (message.trim() || isTurboMode) {
+      const textRequest = {
         ...baseRequest,
         text: {
-          preview_Url: false,
+          preview_url: false,
           body: message,
         },
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-        },
-      });
+      };
 
+      console.log("Sending text request:", JSON.stringify(textRequest, null, 2));
+      
+      const response = await api.post("/api/whatsapp/sender/text", textRequest);
       console.log("Text message response:", response.data);
     }
 
@@ -151,6 +182,7 @@ export async function sendMessage(request: SendMessageRequest) {
       return {
         success: false,
         error: errorMessage,
+        details: error.response?.data
       };
     }
     return {
