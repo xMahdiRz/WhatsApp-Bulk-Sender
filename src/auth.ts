@@ -48,7 +48,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (user) {
         token.accessToken = user.accessToken;
         token.refreshToken = user.refreshToken;
-        token.expiresAt = Date.now() + 30 * 60 * 1000; // 30 minutes
+        token.expiresAt = Date.now() + 60 * 60 * 1000; // 60 minutes
       }
       
       // Handle token refresh
@@ -76,7 +76,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           ...token,
           accessToken: tokens.accessToken,
           refreshToken: tokens.refreshToken,
-          expiresAt: Date.now() + 30 * 60 * 1000, // 30 minutes
+          expiresAt: Date.now() + 60 * 60 * 1000, // 60 minutes
         };
       } catch (error) {
         console.error("Error refreshing access token", error);
