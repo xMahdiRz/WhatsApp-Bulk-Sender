@@ -279,6 +279,37 @@
         }
       }
     },
+    "/api/user/update-scheduled-messages": {
+      "post": {
+        "tags": [
+          "User"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateScheduledMessageSchema"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateScheduledMessageSchema"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateScheduledMessageSchema"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/whatsapp/sender/template": {
       "post": {
         "tags": [
@@ -713,6 +744,20 @@
           },
           "text": {
             "$ref": "#/components/schemas/TextContent"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateScheduledMessageSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "nullable": true
+          },
+          "dueDateUTC": {
+            "type": "string",
+            "format": "date-time"
           }
         },
         "additionalProperties": false

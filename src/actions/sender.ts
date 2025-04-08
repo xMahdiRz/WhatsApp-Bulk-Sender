@@ -7,6 +7,65 @@ import { cookies } from "next/headers";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
+/**
+ * Response type for sender operations
+ */
+type SenderResponse = {
+  success: boolean;
+  data?: any;
+  error?: string;
+  details?: any;
+};
+
+/**
+ * Represents a file attachment for a message
+ */
+export type Attachment = {
+  id: number;
+  name: string;
+  type: string;
+  caption: string;
+  url?: string;
+};
+
+/**
+ * Represents a request to send a message
+ */
+export type SendMessageRequest = {
+  message: string;
+  attachments: Attachment[];
+  isTurboMode: boolean;
+  isScheduled: boolean;
+  scheduledTime?: string;
+  recipients: string[];
+  timeGap?: number;
+  randomizeOrder?: boolean;
+};
+
+/**
+ * Represents a template message request
+ */
+export type TemplateRequest = {
+  to: string[];
+  accessToken: string;
+  delayBetweenMessagesInMs: number;
+  scheduledTimeInUtc: string | null;
+  template: {
+    name: string;
+    language: {
+      policy: string;
+      code: string;
+    };
+    components: {
+      type: string;
+      parameters: Array<{
+        type: string;
+        text: string;
+      }>;
+    };
+  };
+};
+
 // Create axios instance with default config
 const api = axios.create({
   baseURL: API_URL,
@@ -54,26 +113,19 @@ api.interceptors.response.use(
   }
 );
 
-export type Attachment = {
-  id: number;
-  name: string;
-  type: string;
-  caption: string;
-  url?: string;
-};
-
-export type SendMessageRequest = {
-  message: string;
-  attachments: Attachment[];
-  isTurboMode: boolean;
-  isScheduled: boolean;
-  scheduledTime?: string;
-  recipients: string[];
-  timeGap?: number;
-  randomizeOrder?: boolean;
-};
-
-export async function sendMessage(request: SendMessageRequest) {
+/**
+ * Sends a message to multiple recipients
+ * @param {SendMessageRequest} request - The message request details
+ * @returns {Promise<SenderResponse>}
+ * Returns a promise that resolves to an object containing:
+ * - success: boolean indicating if the message was sent successfully
+ * - data: the response data if successful
+ * - error: error message if the request failed
+ * - details: additional error details if available
+ */
+export async function sendMessage(
+  request: SendMessageRequest
+): Promise<SenderResponse> {
   try {
     const {
       message,
@@ -83,7 +135,7 @@ export async function sendMessage(request: SendMessageRequest) {
       scheduledTime,
       recipients,
       timeGap = 0,
-      randomizeOrder = false
+      randomizeOrder = false,
     } = request;
 
     // Get the session token
@@ -98,7 +150,10 @@ export async function sendMessage(request: SendMessageRequest) {
       try {
         const scheduledDate = new Date(scheduledTime);
         if (isNaN(scheduledDate.getTime())) {
-          throw new Error("Invalid date format");
+          return {
+            success: false,
+            error: "Invalid scheduled time format",
+          };
         }
         formattedScheduledTime = scheduledDate.toISOString();
       } catch (error) {
@@ -159,8 +214,11 @@ export async function sendMessage(request: SendMessageRequest) {
         },
       };
 
-      console.log("Sending text request:", JSON.stringify(textRequest, null, 2));
-      
+      console.log(
+        "Sending text request:",
+        JSON.stringify(textRequest, null, 2)
+      );
+
       const response = await api.post("/api/whatsapp/sender/text", textRequest);
       console.log("Text message response:", response.data);
     }
@@ -182,7 +240,7 @@ export async function sendMessage(request: SendMessageRequest) {
       return {
         success: false,
         error: errorMessage,
-        details: error.response?.data
+        details: error.response?.data,
       };
     }
     return {
@@ -192,28 +250,18 @@ export async function sendMessage(request: SendMessageRequest) {
   }
 }
 
-export type TemplateRequest = {
-  to: string[];
-  accessToken: string;
-  delayBetweenMessagesInMs: number;
-  scheduledTimeInUtc: string | null;
-  template: {
-    name: string;
-    language: {
-      policy: string;
-      code: string;
-    };
-    components: {
-      type: string;
-      parameters: Array<{
-        type: string;
-        text: string;
-      }>;
-    };
-  };
-};
-
-export async function sendTemplate(request: TemplateRequest) {
+/**
+ * Sends a template message to multiple recipients
+ * @param {TemplateRequest} request - The template message request details
+ * @returns {Promise<SenderResponse>}
+ * Returns a promise that resolves to an object containing:
+ * - success: boolean indicating if the template was sent successfully
+ * - data: the response data if successful
+ * - error: error message if the request failed
+ */
+export async function sendTemplate(
+  request: TemplateRequest
+): Promise<SenderResponse> {
   try {
     const { to, template } = request;
 

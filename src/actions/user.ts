@@ -48,7 +48,7 @@ api.interceptors.response.use(
 
 /**
  * Fetches the user's message history
- * @returns {Promise<{success: boolean, data?: any, error?: string}>} 
+ * @returns {Promise<{success: boolean, data?: any, error?: string}>}
  * Returns a promise that resolves to an object containing:
  * - success: boolean indicating if the request was successful
  * - data: the message history data if successful
@@ -81,7 +81,7 @@ export async function getUserHistory() {
 
 /**
  * Fetches the user's contacts list
- * @returns {Promise<{success: boolean, data?: any, error?: string}>} 
+ * @returns {Promise<{success: boolean, data?: any, error?: string}>}
  * Returns a promise that resolves to an object containing:
  * - success: boolean indicating if the request was successful
  * - data: the contacts data if successful
@@ -117,7 +117,7 @@ export async function getUserContacts() {
 /**
  * Fetches the message history for a specific contact
  * @param {string} contact - The phone number of the contact
- * @returns {Promise<{success: boolean, data?: any, error?: string}>} 
+ * @returns {Promise<{success: boolean, data?: any, error?: string}>}
  * Returns a promise that resolves to an object containing:
  * - success: boolean indicating if the request was successful
  * - data: the contact's message history if successful
@@ -154,7 +154,7 @@ export async function getContactHistory(contact: string) {
 
 /**
  * Fetches all scheduled messages for the user
- * @returns {Promise<{success: boolean, data?: any, error?: string}>} 
+ * @returns {Promise<{success: boolean, data?: any, error?: string}>}
  * Returns a promise that resolves to an object containing:
  * - success: boolean indicating if the request was successful
  * - data: the scheduled messages data if successful
@@ -163,6 +163,7 @@ export async function getContactHistory(contact: string) {
 export async function getScheduledMessages() {
   try {
     const response = await api.get("/api/user/scheduled-messages");
+    console.log(response.data);
     return { success: true, data: response.data };
   } catch (error) {
     console.error("Error fetching scheduled messages:", error);
@@ -190,13 +191,14 @@ export async function getScheduledMessages() {
 /**
  * Updates a scheduled message
  * @param {string} id - The ID of the scheduled message to update
- * @param {string} dueDateUtc - The new scheduled date and time in UTC
- * @returns {Promise<{success: boolean, data?: any, error?: string}>} 
+ * @param {string} dueDateUTC - The new scheduled date and time in UTC
+ * @returns {Promise<{success: boolean, data?: any, error?: string}>}
  */
-export async function updateScheduledMessage(id: string, dueDateUtc: string) {
+export async function updateScheduledMessage(id: string, dueDateUTC: string) {
   try {
-    const response = await api.put(`/api/user/scheduled-messages/${id}`, {
-      dueDateUtc
+    const response = await api.post("/api/user/update-scheduled-messages", {
+      id,
+      dueDateUTC,
     });
     revalidatePath("/");
     return { success: true, data: response.data };
@@ -226,12 +228,14 @@ export async function updateScheduledMessage(id: string, dueDateUtc: string) {
 /**
  * Cancels a scheduled message
  * @param {string} id - The ID of the scheduled message to cancel
- * @returns {Promise<{success: boolean, data?: any, error?: string}>} 
+ * @returns {Promise<{success: boolean, data?: any, error?: string}>}
  */
 export async function cancelScheduledMessage(id: string) {
   try {
-    // Send the ID in the request body as an object
-    const response = await api.post("/api/user/cancel-scheduled-message", { id });
+    const response = await api.post(
+      "/api/user/cancel-scheduled-message",
+      `"${id}"`
+    );
     revalidatePath("/");
     return { success: true, data: response.data };
   } catch (error) {
