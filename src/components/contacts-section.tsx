@@ -30,7 +30,7 @@ import {
   Pencil,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { addContacts, getContacts, Contact } from "@/actions/contacts"
+import { addContacts, getContacts, Contact, validateContacts } from "@/actions/contacts"
 import Papa from 'papaparse'
 
 interface CsvRow {
@@ -42,6 +42,12 @@ interface ParseResult {
   data: CsvRow[];
   errors: any[];
   meta: any;
+}
+
+interface ValidationResult {
+  input: string;
+  status: string;
+  wa_id: string;
 }
 
 export default function ContactsSection({ 
@@ -139,6 +145,27 @@ export default function ContactsSection({
       toast({
         title: "Error",
         description: "This phone number already exists in your contacts",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Validate the contact
+    const validationResult = await validateContacts([newContact.phoneNumber.replace('+', '')])
+    if (!validationResult.success) {
+      toast({
+        title: "Error",
+        description: "Failed to validate contact",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const validContact = validationResult.data[0]
+    if (validContact.status !== 'valid') {
+      toast({
+        title: "Error",
+        description: "Invalid WhatsApp number",
         variant: "destructive",
       })
       return
@@ -261,12 +288,42 @@ export default function ContactsSection({
               return
             }
 
-            const result = await addContacts([...contacts, ...uniqueNewContacts])
+            // Validate contacts
+            const phoneNumbers = uniqueNewContacts.map(contact => contact.phoneNumber.replace('+', ''))
+            const validationResult = await validateContacts(phoneNumbers)
+            
+            if (!validationResult.success) {
+              toast({
+                title: "Error",
+                description: "Failed to validate contacts",
+                variant: "destructive",
+              })
+              return
+            }
+
+            // Filter out invalid contacts
+            const validContacts = uniqueNewContacts.filter(contact => {
+              const validation = validationResult.data.find(
+                (v: ValidationResult) => v.input === contact.phoneNumber.replace('+', '')
+              )
+              return validation?.status === 'valid'
+            })
+
+            if (validContacts.length === 0) {
+              toast({
+                title: "Error",
+                description: "No valid WhatsApp numbers found in the CSV file",
+                variant: "destructive",
+              })
+              return
+            }
+
+            const result = await addContacts([...contacts, ...validContacts])
             if (result.success) {
-              setContacts([...contacts, ...uniqueNewContacts])
+              setContacts([...contacts, ...validContacts])
               toast({
                 title: "Import successful",
-                description: `${uniqueNewContacts.length} contacts imported successfully`,
+                description: `${validContacts.length} contacts imported successfully`,
               })
             } else {
               toast({

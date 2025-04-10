@@ -54,7 +54,7 @@ import { useFormState, useFormStatus } from "react-dom";
 import { Contact } from "@/actions/contacts";
 import { uploadImageToImgBB } from "@/actions/image-upload";
 import { useSendingLog } from "@/contexts/sending-log";
-import { useSendingSettings } from "@/contexts/sending-settings"
+import { useSendingSettings } from "@/contexts/sending-settings";
 
 interface TemplateParameter {
   type: string;
@@ -129,7 +129,7 @@ export default function MessageComposer({
     { type: string; text: string }[]
   >([]);
   const { addLog } = useSendingLog();
-  const { settings } = useSendingSettings()
+  const { settings } = useSendingSettings();
 
   // Handle text formatting
   const formatText = (format: "bold" | "italic" | "underline") => {
@@ -169,7 +169,27 @@ export default function MessageComposer({
   const insertVariable = (variable: string) => {
     const textarea = document.getElementById("message") as HTMLTextAreaElement;
     const start = textarea.selectionStart;
-    const variableText = `{{${variable}}}`;
+    let variableText = "";
+
+    switch (variable) {
+      case "name":
+        variableText = "{{name}}";
+        break;
+      case "number":
+        variableText = "{{number}}";
+        break;
+      case "timeNow":
+        variableText = "{{timeNow}}";
+        break;
+      case "sentTime":
+        variableText = "{{sentTime}}";
+        break;
+      case "randomTag":
+        variableText = "{{randomTag}}";
+        break;
+      default:
+        variableText = `{{${variable}}}`;
+    }
 
     const newMessage =
       message.substring(0, start) + variableText + message.substring(start);
@@ -216,21 +236,37 @@ export default function MessageComposer({
   const parseApiResponse = (response: any): ParsedResponse[] => {
     if (Array.isArray(response)) {
       return response.map((item: ApiResponseItem) => {
-        const responseContent = JSON.parse(item.responseContent || '{}');
+        const responseContent = JSON.parse(item.responseContent || "{}");
         return {
           recipient: item.recipient,
           isSuccess: item.isSuccess,
           messageId: responseContent.messages?.[0]?.id,
           error: responseContent.error,
-          details: responseContent
+          details: responseContent,
         };
       });
     }
-    return [{
-      isSuccess: response.success,
-      error: response.error,
-      details: response
-    }];
+    return [
+      {
+        isSuccess: response.success,
+        error: response.error,
+        details: response,
+      },
+    ];
+  };
+
+  // Helper function to process variables in message
+  const processVariables = (message: string, contact: Contact) => {
+    const now = new Date();
+    const scheduledTime = isScheduled ? new Date(scheduledDateTime) : now;
+    const randomTag = Math.random().toString(36).substring(2, 8);
+
+    return message
+      .replace(/{{name}}/g, contact.name)
+      .replace(/{{number}}/g, contact.phoneNumber)
+      .replace(/{{timeNow}}/g, now.toLocaleString())
+      .replace(/{{sentTime}}/g, scheduledTime.toLocaleString())
+      .replace(/{{randomTag}}/g, randomTag);
   };
 
   // Handle sending the message
@@ -284,38 +320,46 @@ export default function MessageComposer({
       // If turbo mode is disabled and there's a message, send it first
       if (!isTurboMode && message.trim()) {
         const textResult = await sendMessage({
-          message,
+          message: processVariables(message, selectedContacts[0]), // Process variables for the first contact
           attachments: [],
           isTurboMode: false,
           isScheduled,
           scheduledTime: isScheduled ? scheduledDateTime : undefined,
           recipients: selectedContacts.map((contact) => contact.phoneNumber),
           timeGap: settings.timeGap,
-          randomizeOrder: settings.randomizeOrder
+          randomizeOrder: settings.randomizeOrder,
         });
 
         const parsedResults = parseApiResponse(textResult);
-        
+
         // Log individual results for each recipient
-        parsedResults.forEach(result => {
-          const recipientInfo = result.recipient ? `to ${result.recipient}` : '';
+        parsedResults.forEach((result) => {
+          const recipientInfo = result.recipient
+            ? `to ${result.recipient}`
+            : "";
           if (result.isSuccess) {
             addLog(
-              `Message ${isScheduled ? 'scheduled' : 'sent'} ${recipientInfo}`,
+              `Message ${isScheduled ? "scheduled" : "sent"} ${recipientInfo}`,
               "success",
-              `Message ID: ${result.messageId}\n\nFull Response: ${JSON.stringify(result.details, null, 2)}`
+              `Message ID: ${
+                result.messageId
+              }\n\nFull Response: ${JSON.stringify(result.details, null, 2)}`
             );
           } else {
             addLog(
-              `Failed to ${isScheduled ? 'schedule' : 'send'} message ${recipientInfo}`,
+              `Failed to ${
+                isScheduled ? "schedule" : "send"
+              } message ${recipientInfo}`,
               "error",
-              `Error: ${result.error?.message || "Unknown error"}\n\nFull Response: ${JSON.stringify(result.details, null, 2)}`
+              `Error: ${
+                result.error?.message || "Unknown error"
+              }\n\nFull Response: ${JSON.stringify(result.details, null, 2)}`
             );
           }
         });
 
         // Don't continue if any message failed
-        if (parsedResults.some(r => !r.isSuccess)) {
+        if (parsedResults.some((r) => !r.isSuccess)) {
           return;
         }
       }
@@ -331,31 +375,41 @@ export default function MessageComposer({
             scheduledTime: isScheduled ? scheduledDateTime : undefined,
             recipients: selectedContacts.map((contact) => contact.phoneNumber),
             timeGap: settings.timeGap,
-            randomizeOrder: settings.randomizeOrder
+            randomizeOrder: settings.randomizeOrder,
           });
 
           const parsedResults = parseApiResponse(attachmentResult);
-          
+
           // Log individual results for each recipient
-          parsedResults.forEach(result => {
-            const recipientInfo = result.recipient ? `to ${result.recipient}` : '';
+          parsedResults.forEach((result) => {
+            const recipientInfo = result.recipient
+              ? `to ${result.recipient}`
+              : "";
             if (result.isSuccess) {
               addLog(
-                `Attachment ${isScheduled ? 'scheduled' : 'sent'} ${recipientInfo}: ${attachment.name}`,
+                `Attachment ${
+                  isScheduled ? "scheduled" : "sent"
+                } ${recipientInfo}: ${attachment.name}`,
                 "success",
-                `Message ID: ${result.messageId}\n\nFull Response: ${JSON.stringify(result.details, null, 2)}`
+                `Message ID: ${
+                  result.messageId
+                }\n\nFull Response: ${JSON.stringify(result.details, null, 2)}`
               );
             } else {
               addLog(
-                `Failed to ${isScheduled ? 'schedule' : 'send'} ${attachment.name} ${recipientInfo}`,
+                `Failed to ${isScheduled ? "schedule" : "send"} ${
+                  attachment.name
+                } ${recipientInfo}`,
                 "error",
-                `Error: ${result.error?.message || "Unknown error"}\n\nFull Response: ${JSON.stringify(result.details, null, 2)}`
+                `Error: ${
+                  result.error?.message || "Unknown error"
+                }\n\nFull Response: ${JSON.stringify(result.details, null, 2)}`
               );
             }
           });
 
           // Don't continue if any attachment failed
-          if (parsedResults.some(r => !r.isSuccess)) {
+          if (parsedResults.some((r) => !r.isSuccess)) {
             return;
           }
         }
@@ -371,30 +425,40 @@ export default function MessageComposer({
           scheduledTime: isScheduled ? scheduledDateTime : undefined,
           recipients: selectedContacts.map((contact) => contact.phoneNumber),
           timeGap: settings.timeGap,
-          randomizeOrder: settings.randomizeOrder
+          randomizeOrder: settings.randomizeOrder,
         });
 
         const parsedResults = parseApiResponse(result);
-        
+
         // Log individual results for each recipient
-        parsedResults.forEach(result => {
-          const recipientInfo = result.recipient ? `to ${result.recipient}` : '';
+        parsedResults.forEach((result) => {
+          const recipientInfo = result.recipient
+            ? `to ${result.recipient}`
+            : "";
           if (result.isSuccess) {
             addLog(
-              `Message and attachments ${isScheduled ? 'scheduled' : 'sent'} ${recipientInfo}`,
+              `Message and attachments ${
+                isScheduled ? "scheduled" : "sent"
+              } ${recipientInfo}`,
               "success",
-              `Message ID: ${result.messageId}\n\nFull Response: ${JSON.stringify(result.details, null, 2)}`
+              `Message ID: ${
+                result.messageId
+              }\n\nFull Response: ${JSON.stringify(result.details, null, 2)}`
             );
           } else {
             addLog(
-              `Failed to ${isScheduled ? 'schedule' : 'send'} message and attachments ${recipientInfo}`,
+              `Failed to ${
+                isScheduled ? "schedule" : "send"
+              } message and attachments ${recipientInfo}`,
               "error",
-              `Error: ${result.error?.message || "Unknown error"}\n\nFull Response: ${JSON.stringify(result.details, null, 2)}`
+              `Error: ${
+                result.error?.message || "Unknown error"
+              }\n\nFull Response: ${JSON.stringify(result.details, null, 2)}`
             );
           }
         });
 
-        if (parsedResults.some(r => !r.isSuccess)) {
+        if (parsedResults.some((r) => !r.isSuccess)) {
           return;
         }
       }
@@ -432,7 +496,17 @@ export default function MessageComposer({
       try {
         let fileUrl = "";
         if (file.type.startsWith("image/")) {
-          fileUrl = await uploadImageToImgBB(file);
+          const uploadResult = await uploadImageToImgBB(file);
+          if (uploadResult.success && uploadResult.url) {
+            fileUrl = uploadResult.url;
+          } else {
+            addLog(
+              `Failed to upload ${file.name}`,
+              "error",
+              uploadResult.error || "Unknown error occurred"
+            );
+            continue;
+          }
         }
 
         const newAttachment = {
@@ -590,7 +664,9 @@ export default function MessageComposer({
     if (!scheduledDateTime) {
       // Set default to current date/time if not set
       const now = new Date();
-      const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+      const localDateTime = new Date(
+        now.getTime() - now.getTimezoneOffset() * 60000
+      )
         .toISOString()
         .slice(0, 16);
       setScheduledDateTime(localDateTime);
@@ -833,43 +909,41 @@ export default function MessageComposer({
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
-                <Button
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                  onClick={() =>
-                    toast({
-                      title: "Variables",
-                      description:
-                        "Variable selector would open here to show you all the variables that available for you to use",
-                    })
-                  }
-                >
+                <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
                   Variables
                 </Button>
                 <Button
                   variant="outline"
                   className="border-primary text-primary hover:bg-primary/10"
-                  onClick={() => insertVariable("fullName")}
+                  onClick={() => insertVariable("name")}
                 >
-                  Full Name
+                  Name
                 </Button>
                 <Button
                   variant="outline"
                   className="border-primary text-primary hover:bg-primary/10"
-                  onClick={() => insertVariable("firstName")}
+                  onClick={() => insertVariable("number")}
                 >
-                  First Name
+                  Number
                 </Button>
                 <Button
                   variant="outline"
                   className="border-primary text-primary hover:bg-primary/10"
-                  onClick={() => insertVariable("lastName")}
+                  onClick={() => insertVariable("timeNow")}
                 >
-                  Last Name
+                  Time Now
                 </Button>
                 <Button
                   variant="outline"
                   className="border-primary text-primary hover:bg-primary/10"
-                  onClick={() => insertVariable("random")}
+                  onClick={() => insertVariable("sentTime")}
+                >
+                  Sent Time
+                </Button>
+                <Button
+                  variant="outline"
+                  className="border-primary text-primary hover:bg-primary/10"
+                  onClick={() => insertVariable("randomTag")}
                 >
                   Random Tag
                 </Button>
@@ -1060,11 +1134,23 @@ export default function MessageComposer({
         {isScheduled && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Calendar className="h-4 w-4" />
-            <span>Scheduled for: {new Date(scheduledDateTime).toLocaleString()}</span>
-            <Button variant="outline" size="sm" className="h-7 px-2" onClick={handleScheduleEdit}>
+            <span>
+              Scheduled for: {new Date(scheduledDateTime).toLocaleString()}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-2"
+              onClick={handleScheduleEdit}
+            >
               Edit
             </Button>
-            <Button variant="outline" size="sm" className="h-7 px-2" onClick={handleScheduleRemove}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-2"
+              onClick={handleScheduleRemove}
+            >
               Remove
             </Button>
           </div>
@@ -1080,7 +1166,10 @@ export default function MessageComposer({
         </div>
       </div>
 
-      <Dialog open={isScheduleDialogOpen} onOpenChange={setIsScheduleDialogOpen}>
+      <Dialog
+        open={isScheduleDialogOpen}
+        onOpenChange={setIsScheduleDialogOpen}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Schedule Message</DialogTitle>
@@ -1105,9 +1194,7 @@ export default function MessageComposer({
             <Button variant="outline" onClick={handleScheduleCancel}>
               Cancel
             </Button>
-            <Button onClick={handleScheduleSave}>
-              Save Schedule
-            </Button>
+            <Button onClick={handleScheduleSave}>Save Schedule</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

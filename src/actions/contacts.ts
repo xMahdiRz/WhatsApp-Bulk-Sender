@@ -131,3 +131,39 @@ export async function getContacts(): Promise<ContactResponse> {
     };
   }
 }
+
+export async function validateContacts(contacts: string[]) {
+  try {
+    const response = await api.post(
+      "https://wss.runasp.net/api/whatsapp/stauts/contact-vaild-number",
+      {
+        blocking: "no_wait",
+        contacts: contacts,
+        statusCheckerToken: process.env.STATUS_CHECKER_TOKEN,
+      }
+    );
+
+    return {
+      success: true,
+      data: response.data.contacts,
+    };
+  } catch (error) {
+    console.error("Error validating contacts:", error);
+    if (axios.isAxiosError(error)) {
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        error.message ||
+        "Failed to validate contacts";
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "Failed to validate contacts",
+    };
+  }
+}

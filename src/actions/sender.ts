@@ -270,7 +270,6 @@ export async function sendTemplate(
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("authjs.session-token");
     const authToken = session?.accessToken;
-    console.log("session accessToken: ", session?.accessToken);
 
     if (!authToken || !sessionCookie) {
       return {

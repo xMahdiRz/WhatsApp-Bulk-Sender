@@ -64,17 +64,53 @@ export default function MessageReports() {
   // Calculate metrics
   const totalMessages = messages.length
   const successRate = totalMessages > 0 ? Math.round((sentMessages.length / totalMessages) * 100) : 0
-  const lastCampaignDate = messages.length > 0 
-    ? new Date(JSON.parse(messages[0].requestBody).timestamp).toLocaleDateString()
-    : "No messages yet"
 
   // Handle download report
   const handleDownloadReport = () => {
-    toast({
-      title: "Report Download Started",
-      description: "Your report is being generated and will download shortly.",
-    })
-    // In a real app, this would generate and download a CSV/Excel file
+    try {
+      // Create CSV content
+      const headers = ['ID', 'Phone Number', 'Status', 'Type', 'Message Content']
+      const rows = messages.map(message => {
+        const status = message.isSuccessfull ? 'Delivered' : 'Failed'
+        const type = message.isScheduled ? 'Scheduled' : 'Instant'
+        const messageContent = JSON.parse(message.requestBody).message || ''
+        return [
+          message.id,
+          message.phoneNumber,
+          status,
+          type,
+          messageContent
+        ]
+      })
+
+      // Convert to CSV string
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+      ].join('\n')
+
+      // Create blob and download
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.setAttribute('href', url)
+      link.setAttribute('download', `message-report-${new Date().toISOString().split('T')[0]}.csv`)
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+
+      toast({
+        title: "Report Downloaded",
+        description: "Your message report has been downloaded successfully.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to generate report. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
   if (isLoading) {
@@ -97,7 +133,7 @@ export default function MessageReports() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Messages</CardTitle>
@@ -118,18 +154,6 @@ export default function MessageReports() {
             <div className="flex items-center justify-between">
               <div className="text-2xl font-bold">{successRate}%</div>
               <CheckCircle className="h-4 w-4 text-primary" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Last Campaign</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div className="text-2xl font-bold">{lastCampaignDate}</div>
-              <Clock className="h-4 w-4 text-muted-foreground" />
             </div>
           </CardContent>
         </Card>

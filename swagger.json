@@ -191,6 +191,37 @@
         }
       }
     },
+    "/api/user/update-scheduled-messages": {
+      "post": {
+        "tags": [
+          "User"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateScheduledMessageSchema"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateScheduledMessageSchema"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateScheduledMessageSchema"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/user/cancel-scheduled-message": {
       "post": {
         "tags": [
@@ -272,37 +303,6 @@
         "tags": [
           "User"
         ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/user/update-scheduled-messages": {
-      "post": {
-        "tags": [
-          "User"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateScheduledMessageSchema"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateScheduledMessageSchema"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateScheduledMessageSchema"
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "OK"
@@ -433,6 +433,37 @@
           }
         }
       }
+    },
+    "/api/whatsapp/stauts/contact-vaild-number": {
+      "post": {
+        "tags": [
+          "WhatsappStatus"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckContactNumberRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckContactNumberRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckContactNumberRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -446,6 +477,32 @@
               "$ref": "#/components/schemas/UserContactInfo"
             },
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CheckContactNumberRequest": {
+        "required": [
+          "blocking",
+          "contacts",
+          "statusCheckerToken"
+        ],
+        "type": "object",
+        "properties": {
+          "blocking": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "contacts": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "statusCheckerToken": {
+            "minLength": 1,
+            "type": "string"
           }
         },
         "additionalProperties": false
